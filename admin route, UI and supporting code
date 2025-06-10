@@ -1,0 +1,4 @@
+Creating the /admin route.
+Adding logic to check if the logged-in user is the admin.
+Implementing functions to fetch data across users based on filters.
+Building a simple UI for the dashboard.
