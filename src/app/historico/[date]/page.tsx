@@ -9,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, TrendingUp, TrendingDown, Pencil, DollarSign, Download, CreditCard, QrCode, Banknote, Coins, ReceiptText, UserMinus, Wallet } from 'lucide-react'; // Removido Package e ícones de entrada não usados aqui
 import { useToast } from "@/hooks/use-toast";
-import { format, parse, isValid, subDays, isAfter, parseISO } from 'date-fns';
+import { format, parse, isValid, subDays, isAfter, parseISO } from 'date-fns'; // isValid might need to be isValidDate depending on usage
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, getStoreName } from '@/lib/utils';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Navbar from '@/components/navbar';
@@ -49,19 +49,8 @@ interface ClosingHistoryData {
     updated_at: string;
 }
 
-const formatCurrency = (value: number | undefined | null): string => {
-  if (value === undefined || value === null || isNaN(value) || !isFinite(value)) return 'R$ 0,00';
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-};
-const getStoreName = (lojaId: string | null | undefined): string => {
-    if (!lojaId) return 'Desconhecida';
-    if (lojaId === 'capao') return 'Top Capão Bonito';
-    if (lojaId === 'guapiara') return 'Top Guapiara';
-    if (lojaId === 'ribeirao') return 'Top Ribeirão Branco';
-    if (lojaId === 'admin') return 'Caixa Simone';
-    return lojaId;
-};
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+// formatCurrency and getStoreName are now imported from @/lib/utils
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1); // Kept local as it's not widely duplicated yet
 const entradaIdToLabelMap: Record<string, string> = {
     carro: "Carro", caminhonete: "Caminhonete", caminhao: "Caminhão", moto: "Moto",
     cautelar: "Cautelar", revistoriaDetran: "Revistoria DETRAN", pesquisaProcedencia: "Pesquisa de Procedência",

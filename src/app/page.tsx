@@ -15,7 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import Navbar from '@/components/navbar';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
@@ -165,12 +165,6 @@ export default function HomePage() {
   const handleGoToNewClosing = () => {
      router.push('/fechamento');
   };
-
-  const formatCurrency = (value: number | undefined | null): string => {
-    if (value === undefined || value === null || isNaN(value) || !isFinite(value)) return 'R$ 0,00';
-    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
 
   const closingsCardTitle = searchActive && selectedDate
      ? `Fechamentos de ${format(selectedDate, 'PPP', { locale: ptBR })}`

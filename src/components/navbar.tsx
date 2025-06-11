@@ -16,99 +16,134 @@ interface Profile {
   admin?: boolean | null;
 }
 
+/**
+ * Componente Navbar para a aplicação.
+ * Responsável por exibir o logo, navegação básica, informações do usuário logado
+ * e opções de login/logout. Interage com o Supabase para obter o estado de autenticação
+ * e dados do perfil do usuário.
+ */
 export function Navbar() {
-  const supabase = createClient();
-  const router = useRouter();
-  const pathname = usePathname();
-  const { toast } = useToast();
+  const supabase = createClient(); // Cliente Supabase para interações com o backend.
+  const router = useRouter(); // Hook do Next.js para navegação programática.
+  const pathname = usePathname(); // Hook do Next.js para obter o caminho da rota atual.
+  const { toast } = useToast(); // Hook para exibir notificações (toasts).
 
-  // Ref para armazenar o pathname mais recente
+  // Ref para armazenar o pathname mais recente.
+  // Isto é usado no listener de autenticação para evitar dependência direta de `pathname`
+  // que poderia causar re-execuções indesejadas do useEffect.
   const pathnameRef = useRef(pathname);
 
-  // Efeito para manter o pathnameRef atualizado
+  // Efeito para manter `pathnameRef.current` sincronizado com o `pathname` atual.
   useEffect(() => {
     pathnameRef.current = pathname;
   }, [pathname]);
 
+  // Estado para armazenar o objeto do usuário autenticado do Supabase.
   const [user, setUser] = useState<User | null>(null);
+  // Estado para armazenar os dados do perfil do usuário (da tabela 'profiles').
   const [profile, setProfile] = useState<Profile | null>(null);
+  // Estado para controlar o feedback visual de carregamento, especialmente durante operações assíncronas como login/logout.
   const [isLoading, setIsLoading] = useState(true);
 
-  // Memoize the profile fetching logic
+  /**
+   * Busca o perfil detalhado do usuário na tabela 'profiles' do Supabase.
+   * Esta função é memoizada com `useCallback` para otimizar performance,
+   * evitando recriações em cada renderização do Navbar, a menos que `supabase` ou `toast` mudem.
+   * @async
+   * @param {string} userId - O ID do usuário (geralmente `auth.user.id`) cujo perfil será buscado.
+   * @returns {Promise<Profile | null>} Uma promessa que resolve para o objeto de perfil ou `null`.
+   */
   const fetchUserProfile = useCallback(async (userId: string): Promise<Profile | null> => {
-    console.log(`[DEBUG Navbar] Attempting to fetch profile for user ID: ${userId}`);
+    // console.log(`[DEBUG Navbar] Tentando buscar perfil para User ID: ${userId}`);
     const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('loja_id, nome_operador, admin')
-      .eq('id', userId)
-      .maybeSingle();
+      .from('profiles') // Tabela de perfis
+      .select('loja_id, nome_operador, admin') // Campos selecionados
+      .eq('id', userId) // Filtro pelo ID do usuário
+      .maybeSingle(); // Retorna um único objeto ou null, sem erro se não encontrado.
 
     if (profileError) {
-      console.error(`[DEBUG Navbar] Error fetching profile for ${userId}:`, profileError);
+      console.error(`[DEBUG Navbar] Erro ao buscar perfil para ${userId}:`, profileError);
+      toast({ variant: "destructive", title: "Erro ao buscar perfil", description: "Não foi possível carregar os dados do seu perfil." });
       return null;
-    } else if (!profileData) {
-      console.warn(`[DEBUG Navbar] Profile not found for user ID: ${userId}`);
-      return null;
-    } else {
-      console.log(`[DEBUG Navbar] Profile fetched successfully for ${userId}:`, profileData);
-      return profileData;
     }
-  }, [supabase]);
+    // Não é necessário um `else if (!profileData)` explícito aqui, pois `maybeSingle()` já trata isso.
+    // console.log(`[DEBUG Navbar] Perfil buscado para ${userId}:`, profileData);
+    return profileData;
+  }, [supabase, toast]);
 
-  // Effect for initial session check and profile fetch
+  // Efeito para carregar a sessão e o perfil do usuário na montagem inicial do componente.
   useEffect(() => {
     const handleInitialLoad = async () => {
       setIsLoading(true);
+      // Obtém a sessão atual do Supabase.
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
+      setUser(currentUser); // Define o usuário no estado.
+
       if (currentUser) {
+        // Se houver um usuário na sessão, busca seu perfil.
         const fetchedProfile = await fetchUserProfile(currentUser.id);
         setProfile(fetchedProfile);
       } else {
+        // Se não houver sessão, garante que o perfil também seja nulo.
         setProfile(null);
       }
-      setIsLoading(false);
+      setIsLoading(false); // Finaliza o estado de carregamento.
     };
 
     handleInitialLoad();
-  }, [supabase, fetchUserProfile]);
+  }, [supabase, fetchUserProfile]); // `fetchUserProfile` é memoizada.
 
-  // Effect for listening to auth state changes and handling redirection
+  // Efeito para monitorar mudanças no estado de autenticação (login/logout) e reagir adequadamente.
   useEffect(() => {
+    // `onAuthStateChange` retorna um objeto com uma propriedade `subscription`.
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser); // Update user state
-      let currentProfile: Profile | null = null; // Use a local variable for immediate profile data
+      setUser(currentUser); // Atualiza o estado do usuário com base na sessão.
 
+      let fetchedProfile: Profile | null = null;
       if (currentUser) {
-        currentProfile = await fetchUserProfile(currentUser.id);
-        setProfile(currentProfile);
+        // Se um usuário está presente (login ou refresh de sessão), busca/atualiza o perfil.
+        fetchedProfile = await fetchUserProfile(currentUser.id);
+        setProfile(fetchedProfile);
       } else {
+        // Se não há usuário (logout), limpa o perfil.
         setProfile(null);
       }
 
-      // Handle redirection based on event and current pathname (via ref)
+      // Lógica de redirecionamento pós-login/logout.
+      // Utiliza `pathnameRef.current` para evitar dependência direta de `pathname` no array de dependências do useEffect,
+      // o que poderia causar loops de re-renderização ou execuções em momentos não ideais.
       if (event === "SIGNED_IN") {
-        if (pathnameRef.current === "/login") { // Usando pathnameRef.current
-            if (currentProfile?.admin) {
+        // Se o usuário fez login e estava na página de login, redireciona.
+        if (pathnameRef.current === "/login") {
+            if (fetchedProfile?.admin) { // Redireciona admin para /admin.
               router.push('/admin');
-            } else {
+            } else { // Redireciona não-admin para a página inicial.
               router.push('/');
             }
         }
-      } else if (event === "SIGNED_OUT" && pathnameRef.current !== "/login") { // Usando pathnameRef.current
-        router.push('/login');
+      } else if (event === "SIGNED_OUT") {
+        // Se o usuário fez logout e não está já na página de login, redireciona para /login.
+        if (pathnameRef.current !== "/login") {
+            router.push('/login');
+        }
       }
     });
 
+    // Função de limpeza: desinscreve o listener de autenticação quando o componente é desmontado.
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, [supabase, router, fetchUserProfile]); // Removido pathname das dependências
+  }, [supabase, router, fetchUserProfile]); // `fetchUserProfile` é memoizada.
 
+  /**
+   * Realiza o logout do usuário.
+   * Atualiza o estado de `isLoading` e exibe notificações de sucesso ou erro.
+   * O redirecionamento é tratado pelo listener `onAuthStateChange`.
+   */
   const handleLogout = async () => {
-    setIsLoading(true);
+    setIsLoading(true); // Indica que uma operação assíncrona está em andamento.
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast({
