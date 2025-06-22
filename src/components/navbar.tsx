@@ -16,7 +16,7 @@ interface Profile {
   admin?: boolean | null;
 }
 
-export function Navbar() {
+export function Navbar({ className = '', ...props }: React.HTMLAttributes<HTMLElement>) {
   const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -128,7 +128,7 @@ export function Navbar() {
   const logoLink = profile?.admin ? "/admin" : "/";
 
   return (
-    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/60">
+    <header className={`sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/60 ${className}`} {...props}>
       <div className="container mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center">
           <Link href={logoLink} className="flex items-center">
